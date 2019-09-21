@@ -1,29 +1,33 @@
 import sys
-import python_cython_stan_test.normal as normal
-import python_cython_stan_test.services.arguments as arguments
+import time
+import threading
 
 
-if __name__ == "__main__":
+def task():
+    import python_cython_stan_test.normal as normal
     queue_wrapper = normal.SPSCQueue(capacity=10_000_000)
     function_basename = "hmc_nuts_diag_e_adapt_wrapper"
     function_wrapper = normal.hmc_nuts_diag_e_adapt_wrapper
 
-    # Fetch defaults for missing arguments. This is an important piece!
-    # For example, `random_seed`, if not in `kwargs`, will be set.
+    kwargs = {'random_seed': 1, 'chain': 1, 'init_radius': 2, 'num_warmup': 100,
+              'num_samples': 100, 'num_thin': 1, 'save_warmup': False,
+              'refresh': 10, 'stepsize': 1.0, 'stepsize_jitter': 0.0,
+              'max_depth': 10, 'delta': 0.8, 'gamma': 0.05, 'kappa': 0.75, 't0':
+              10.0, 'init_buffer': 75, 'term_buffer': 50, 'window': 25}
 
-    # exclude {"data", "queue"} from arguments
-    function_arguments = "random_seed chain init_radius num_warmup num_samples num_thin save_warmup refresh stepsize stepsize_jitter max_depth delta gamma kappa t0 init_buffer term_buffer window".split()
-
-    # This is clumsy due to the way default values are available. There is no
-    # way to directly lookup the default value for an argument (e.g., `delta`)
-    # given both the argument name and the (full) function name (e.g.,
-    # `stan::services::hmc_nuts_diag_e_adapt`).
-    kwargs = {}
-    for arg in function_arguments:
-        if arg not in kwargs:
-            kwargs[arg] = arguments.lookup_default(arguments.Method["SAMPLE"], arg)
-    print(kwargs)
     data = {}
     function_wrapper(data, queue_wrapper, **kwargs)
+    time.sleep(1)
+    return
+
+
+if __name__ == "__main__":
+    threads = []
+    for _ in range(4):
+        th = threading.Thread(target=task)
+        th.start()
+        threads.append(th)
+    for th in threads:
+        th.join()
     print("success")
     sys.exit(0)
